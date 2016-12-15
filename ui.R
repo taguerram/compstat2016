@@ -2,6 +2,10 @@ library(shiny)
 library(plotly)
 library(ggplot2movies)
 library(DT)
+library(Rcpp)
+library(RcppArmadillo)
+
+sourceCpp("/home/thalia/Maestría/Estadística_Computacional/compstat2016/mcmc.cpp")
 
 ui <- (fluidPage (
   
@@ -71,7 +75,31 @@ ui <- (fluidPage (
          fluidRow(
            DT::dataTableOutput("table")),
          
-         column(10, plotlyOutput(outputId = "scatterplot"))
+         column(10, plotlyOutput(outputId = "scatterplot")),
+         
+         column(4, selectInput("alpha", "Seleciona la adistribución a priori para alpha:", c("normal","gamma","uniform"))),
+         column(4, selectInput("beta", "Seleciona la adistribución a priori para beta:", c("normal","gamma","uniform"))),
+         column(4, selectInput("sigma", "Seleciona la adistribución a priori para sigma:", c("normal","gamma","uniform"))),
+         
+         column(4, plotlyOutput(outputId = "alphaPlot")),
+         column(4, plotlyOutput(outputId = "betaPlot")),
+         column(4, plotlyOutput(outputId = "sigmaPlot")),
+         
+         column(5, sliderInput(inputId = "longitud", value = 100, label = "Escoge la longitud de las cadenas", max = 10000, min = 100, step = 1)),
+         column(5, sliderInput(inputId = "ncadenas", value = 100, label = "Escoge el número de cadenas", max = 1000, min = 100, step = 1)),
+         column(10, actionButton("go", "Go")),
+         
+         column(4, plotlyOutput((outputId = "cadenaalpha"))),
+         column(4, plotlyOutput((outputId = "cadenabeta"))),
+         column(4, plotlyOutput((outputId = "cadenasigma"))),
+         
+         column(4, plotlyOutput((outputId = "alphapostplot"))),
+         column(4, plotlyOutput((outputId = "betapostplot"))),
+         column(4, plotlyOutput((outputId = "sigmapostplot"))),
+         
+         column(4, plotlyOutput((outputId = "compalpha"))),
+         column(4, plotlyOutput((outputId = "compbeta"))),
+         column(4, plotlyOutput((outputId = "compsigma")))
        )
        )
     )

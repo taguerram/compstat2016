@@ -21,8 +21,12 @@ server <- function(input,output){
     E
   })
   
+  # Histograma
+  
   output$hist <- renderPlot({
     hist(Finv(), breaks = input$bin)})
+  
+  # Xi cuadrada
   
   output$text <- renderText({ 
     
@@ -49,6 +53,8 @@ server <- function(input,output){
     }
     
   })
+  
+  # Comparación visual
   
   output$comp <- renderPlotly ({
     
@@ -87,13 +93,14 @@ server <- function(input,output){
     estimador
   })
   
+  # Área bajo la curva
   
   output$area <- renderText({
     
     paste("El área bajo la curva es", FMC())
   })
 
-  
+  # Gráfica
   
   output$areaplot <- renderPlotly({
     
@@ -130,25 +137,201 @@ server <- function(input,output){
   
   # TAREA 3
   
+  # Tabla con datos
+  
   output$table <- DT::renderDataTable(DT::datatable({
-    data <- movies[which(movies$budget != 'NA'), ]
+    data <- movies[which(movies$budget != 'NA'), c(1:6)]
     data
   }))
   
+  # Definir variables
   
-  
-  output$scatterplot <- renderPlotly ({
-    
-    data <- movies[which(movies$budget != 'NA'), ]
-    
+  varindep <- reactive({
+    data <- movies[which(movies$budget != 'NA'), c(1:6)]
     varindep <- data[ ,which(names(data) == input$varindep)]
-    vardep <- data[ ,which(names(data) == input$vardep)]
-    
-    datos <- cbind(varindep, vardep)
+    varindep
+  })
+  
+  vardep <- reactive({
+    data <- movies[which(movies$budget != 'NA'),  c(1:6)]
+    varindep <- data[ ,which(names(data) == input$vardep)]
+    varindep
+  })
+  
+  datos <- reactive({
+    datos <- cbind(varindep(), vardep())
     nombres <- c('varindep', 'vardep')
     colnames(datos) <- nombres
-    
-    plot_ly(datos, x = datos$varindep, y = datos$vardep, type = 'scatter', mode = 'markers')
-  })  
+    datos
+  })
   
+  # Scatter plot 
+  
+  output$scatterplot <- renderPlotly ({
+    datos <- datos()
+    plot_ly(datos, x = datos$varindep, y = datos$vardep, type = 'scatter', mode = 'markers')
+  })
+  
+  # Distribuciones a priori
+  
+  alphaDist <- reactive({
+    input$alpha
+  })
+  
+  betaDist <- reactive({
+    input$beta
+  })
+  
+  sigmaDist <- reactive({
+    input$sigma
+  })
+    
+  plotPrior <- function(dist){
+    
+    if(dist == "normal") {
+      x <- seq(-10, 10, by=.1)
+      y <- dnorm(x)
+      plt <- plot_ly(x = x, y = y, type = 'scatter', mode = 'lines', name = 'prior')
+    }
+    
+    else if(dist == "gamma")
+    {
+      x <- seq(0, 10, by=.1)
+      y <- dgamma(x,2,2)
+      plt <- plot_ly(x = x, y = y,  type = 'scatter', mode = 'lines', name = 'prior')
+    } 
+    else if(dist == "uniform")
+    {
+      x <- seq(0, 10, by=.1)
+      y <- dunif(x)
+      plt <- plot_ly(x = x, y = y, type = 'scatter', mode = 'lines', name = 'prior')
+    }
+    plt
+  }
+  
+  
+  output$alphaPlot <- renderPlotly({
+    plotPrior(alphaDist())
+  })
+  
+  output$betaPlot <- renderPlotly({
+    plotPrior(betaDist())
+  })
+  
+  output$sigmaPlot <- renderPlotly({
+    plotPrior(sigmaDist())
+  })
+  
+  # Simulación
+  
+  ncadenas <- reactive({
+    input$ncadenas
+  })
+  
+  longitud <- reactive({
+    input$longitud
+  })
+  
+  cadena <- eventReactive(input$go, {
+    
+    n <- longitud()
+    datos <- datos()
+
+    x <- datos$varindep
+    y <- datos$vardep
+    
+    mcmc <- mcmc(n, c(0,0,0), x, y)
+    mcmc$chain
+  })
+  
+  # Cadenas
+  
+  output$cadenaalpha<- renderPlotly({
+    ncadenas <- longitud() - ncadenas()
+    cadena <- cadena()
+    cadena <- cadena[-(1:ncadenas) , 1]
+    plot_ly(y = cadena, type = 'scatter', mode = 'lines')
+  })
+  
+  output$cadenabeta <- renderPlotly({
+    ncadenas <- longitud() - ncadenas()
+    cadena <- cadena()
+    cadena <- cadena[-(1:ncadenas) , 2]
+    plot_ly(y = cadena, type = 'scatter', mode = 'lines')
+  })
+  
+  output$cadenasigma <- renderPlotly({
+    ncadenas <- longitud() - ncadenas()
+    cadena <- cadena()
+    cadena <- cadena[-(1:ncadenas) , 3]
+    plot_ly(y = cadena, type = 'scatter', mode = 'lines')
+  })
+  
+  # Histogramas 
+
+  output$alphapostplot <- renderPlotly({
+    ncadenas <- longitud() - ncadenas()
+    cadena <- cadena()
+    cadena <- cadena[-(1:ncadenas) , 1]
+    plot_ly(x = cadena, type="histogram", name = "Posterior alpha", nbinsx = 10)
+  })
+  
+  output$betapostplot <- renderPlotly({
+    ncadenas <- longitud() - ncadenas()
+    cadena <- cadena()
+    cadena <- cadena[-(1:ncadenas) , 2]
+    plot_ly(x=cadena, type="histogram", name = "Posterior beta", nbinsx = 10)
+  })
+  
+  output$sigmapostplot <- renderPlotly({
+    ncadenas <- longitud() - ncadenas()
+    cadena <- cadena()
+    cadena <- cadena[-(1:ncadenas) , 3]
+    plot_ly(x=cadena, type="histogram", name = "Posterior sigma", nbinsx = 10)
+  })
+  
+  
+  # Comparación de densidad
+  
+  output$compalpha <- renderPlotly({
+    ncadenas <- longitud() - ncadenas()
+    cadena <- cadena()
+    cadena <- cadena[-(1:ncadenas) , 1]
+    densidad <- density(cadena)
+    d1 <- densidad[[1]]
+    d2 <- densidad[[2]]
+    
+    plotPrior(alphaDist()) %>%
+      add_trace(x = d1, y = d2, type = 'scatter', mode = 'lines', name = 'posterior') %>%
+      layout(yaxis2 = list(overlaying = "y", side = "right"))
+    
+  })
+    
+    output$compbeta <- renderPlotly({
+      ncadenas <- longitud() - ncadenas()
+      cadena <- cadena()
+      cadena <- cadena[-(1:ncadenas) , 2]
+      densidad <- density(cadena)
+      d1 <- densidad[[1]]
+      d2 <- densidad[[2]]
+      
+      plotPrior(betaDist()) %>%
+        add_trace(x = d1, y = d2, type = 'scatter', mode = 'lines', name = 'posterior') %>%
+        layout(yaxis2 = list(overlaying = "y", side = "right"))
+  
+  })
+      
+    output$compsigma <- renderPlotly({
+      ncadenas <- longitud() - ncadenas()
+      cadena <- cadena()
+      cadena <- cadena[-(1:ncadenas) , 3]
+      densidad <- density(cadena)
+      d1 <- densidad[[1]]
+      d2 <- densidad[[2]]
+    
+      plotPrior(sigmaDist()) %>%
+        add_trace(x = d1, y = d2, type = 'scatter', mode = 'lines', name = 'posterior') %>%
+        layout(yaxis2 = list(overlaying = "y", side = "right"))
+  })
+    
 }
